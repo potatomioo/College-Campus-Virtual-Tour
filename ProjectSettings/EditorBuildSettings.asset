@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1045 &1
+EditorBuildSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Scenes/campus.unity
+    guid: 9fc0d4010bbf28b4594072e72b8655ab
+  - enabled: 1
+    path: Assets/Scenes/Library.unity
+    guid: 5dc8bdf98fb624c4a9f4763ccadd7817
+  - enabled: 1
+    path: Assets/Scenes/Canteen.unity
+    guid: da5f2f5a7f74c234eb713bbc8d5536ae
+  - enabled: 1
+    path: Assets/Scenes/seminar.unity
+    guid: b730ba29e92ce2a44bd51c6bcb1cf4c1
+  m_configObjects: {}

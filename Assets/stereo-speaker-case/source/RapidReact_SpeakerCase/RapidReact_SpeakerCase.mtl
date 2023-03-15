@@ -1,0 +1,24 @@
+# Blender MTL File: 'RapidReact.blend'
+# Material Count: 2
+
+newmtl M_SpeakerMesh
+Ns 225.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.000000 0.000000 0.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd D:\\3D Models\\Textures\\RapidReact\\SpeakerMesh.jpeg
+
+newmtl M_StandWood
+Ns 8.357360
+Ka 1.000000 1.000000 1.000000
+Kd 0.800000 0.800000 0.800000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd D:\\3D Models\\DSN\\Rapid React Assets\\TV Stand\\WOOD.jpg
