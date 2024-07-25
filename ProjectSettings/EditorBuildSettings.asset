@@ -17,4 +17,8 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/seminar.unity
     guid: b730ba29e92ce2a44bd51c6bcb1cf4c1
-  m_configObjects: {}
+  m_configObjects:
+    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: a95a3a49810d9064082394eee10d3fa1,
+      type: 2}
+    com.unity.xr.openxr.settings4: {fileID: 11400000, guid: 0c6d27cd20777e8409dbc92667f9a4a0,
+      type: 2}

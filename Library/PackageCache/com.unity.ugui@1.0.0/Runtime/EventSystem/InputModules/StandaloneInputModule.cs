@@ -24,6 +24,8 @@ namespace UnityEngine.EventSystems
 
         private PointerEventData m_InputPointerEvent;
 
+        private const float doubleClickTime = 0.3f;
+
         protected StandaloneInputModule()
         {
         }
@@ -70,6 +72,7 @@ namespace UnityEngine.EventSystems
 
         [SerializeField]
         [FormerlySerializedAs("m_AllowActivationOnMobileDevice")]
+        [HideInInspector]
         private bool m_ForceModuleActive;
 
         [Obsolete("allowActivationOnMobileDevice has been deprecated. Use forceModuleActive instead (UnityUpgradable) -> forceModuleActive")]
@@ -85,6 +88,8 @@ namespace UnityEngine.EventSystems
         /// <remarks>
         /// If there is no module active with higher priority (ordered in the inspector) this module will be forced active even if valid enabling conditions are not met.
         /// </remarks>
+
+        [Obsolete("forceModuleActive has been deprecated. There is no need to force the module awake as StandaloneInputModule works for all platforms")]
         public bool forceModuleActive
         {
             get { return m_ForceModuleActive; }
@@ -150,19 +155,11 @@ namespace UnityEngine.EventSystems
 
         private bool ShouldIgnoreEventsOnNoFocus()
         {
-            switch (SystemInfo.operatingSystemFamily)
-            {
-                case OperatingSystemFamily.Windows:
-                case OperatingSystemFamily.Linux:
-                case OperatingSystemFamily.MacOSX:
 #if UNITY_EDITOR
-                    if (UnityEditor.EditorApplication.isRemoteConnected)
-                        return false;
+            return !UnityEditor.EditorApplication.isRemoteConnected;
+#else
+            return true;
 #endif
-                    return true;
-                default:
-                    return false;
-            }
         }
 
         public override void UpdateModule()
@@ -187,14 +184,14 @@ namespace UnityEngine.EventSystems
         {
             ExecuteEvents.Execute(pointerEvent.pointerPress, pointerEvent, ExecuteEvents.pointerUpHandler);
 
-            var pointerUpHandler = ExecuteEvents.GetEventHandler<IPointerClickHandler>(currentOverGo);
+            var pointerClickHandler = ExecuteEvents.GetEventHandler<IPointerClickHandler>(currentOverGo);
 
             // PointerClick and Drop events
-            if (pointerEvent.pointerPress == pointerUpHandler && pointerEvent.eligibleForClick)
+            if (pointerEvent.pointerClick == pointerClickHandler && pointerEvent.eligibleForClick)
             {
-                ExecuteEvents.Execute(pointerEvent.pointerPress, pointerEvent, ExecuteEvents.pointerClickHandler);
+                ExecuteEvents.Execute(pointerEvent.pointerClick, pointerEvent, ExecuteEvents.pointerClickHandler);
             }
-            else if (pointerEvent.pointerDrag != null && pointerEvent.dragging)
+            if (pointerEvent.pointerDrag != null && pointerEvent.dragging)
             {
                 ExecuteEvents.ExecuteHierarchy(currentOverGo, pointerEvent, ExecuteEvents.dropHandler);
             }
@@ -202,6 +199,7 @@ namespace UnityEngine.EventSystems
             pointerEvent.eligibleForClick = false;
             pointerEvent.pointerPress = null;
             pointerEvent.rawPointerPress = null;
+            pointerEvent.pointerClick = null;
 
             if (pointerEvent.pointerDrag != null && pointerEvent.dragging)
                 ExecuteEvents.Execute(pointerEvent.pointerDrag, pointerEvent, ExecuteEvents.endDragHandler);
@@ -220,11 +218,6 @@ namespace UnityEngine.EventSystems
             }
 
             m_InputPointerEvent = pointerEvent;
-        }
-
-        public override bool IsModuleSupported()
-        {
-            return m_ForceModuleActive || input.mousePresent || input.touchSupported;
         }
 
         public override bool ShouldActivateModule()
@@ -356,14 +349,22 @@ namespace UnityEngine.EventSystems
                     pointerEvent.pointerEnter = currentOverGo;
                 }
 
+                var resetDiffTime = Time.unscaledTime - pointerEvent.clickTime;
+                if (resetDiffTime >= doubleClickTime)
+                {
+                    pointerEvent.clickCount = 0;
+                }
+
                 // search for the control that will receive the press
                 // if we can't find a press handler set the press
                 // handler to be what would receive a click.
                 var newPressed = ExecuteEvents.ExecuteHierarchy(currentOverGo, pointerEvent, ExecuteEvents.pointerDownHandler);
 
+                var newClick = ExecuteEvents.GetEventHandler<IPointerClickHandler>(currentOverGo);
+
                 // didnt find a press handler... search for a click handler
                 if (newPressed == null)
-                    newPressed = ExecuteEvents.GetEventHandler<IPointerClickHandler>(currentOverGo);
+                    newPressed = newClick;
 
                 // Debug.Log("Pressed: " + newPressed);
 
@@ -372,7 +373,7 @@ namespace UnityEngine.EventSystems
                 if (newPressed == pointerEvent.lastPress)
                 {
                     var diffTime = time - pointerEvent.clickTime;
-                    if (diffTime < 0.3f)
+                    if (diffTime < doubleClickTime)
                         ++pointerEvent.clickCount;
                     else
                         pointerEvent.clickCount = 1;
@@ -386,6 +387,7 @@ namespace UnityEngine.EventSystems
 
                 pointerEvent.pointerPress = newPressed;
                 pointerEvent.rawPointerPress = currentOverGo;
+                pointerEvent.pointerClick = newClick;
 
                 pointerEvent.clickTime = time;
 
@@ -394,8 +396,6 @@ namespace UnityEngine.EventSystems
 
                 if (pointerEvent.pointerDrag != null)
                     ExecuteEvents.Execute(pointerEvent.pointerDrag, pointerEvent, ExecuteEvents.initializePotentialDrag);
-
-                m_InputPointerEvent = pointerEvent;
             }
 
             // PointerUp notification
@@ -407,12 +407,12 @@ namespace UnityEngine.EventSystems
                 // Debug.Log("KeyCode: " + pointer.eventData.keyCode);
 
                 // see if we mouse up on the same element that we clicked on...
-                var pointerUpHandler = ExecuteEvents.GetEventHandler<IPointerClickHandler>(currentOverGo);
+                var pointerClickHandler = ExecuteEvents.GetEventHandler<IPointerClickHandler>(currentOverGo);
 
                 // PointerClick and Drop events
-                if (pointerEvent.pointerPress == pointerUpHandler && pointerEvent.eligibleForClick)
+                if (pointerEvent.pointerClick == pointerClickHandler && pointerEvent.eligibleForClick)
                 {
-                    ExecuteEvents.Execute(pointerEvent.pointerPress, pointerEvent, ExecuteEvents.pointerClickHandler);
+                    ExecuteEvents.Execute(pointerEvent.pointerClick, pointerEvent, ExecuteEvents.pointerClickHandler);
                 }
 
                 if (pointerEvent.pointerDrag != null && pointerEvent.dragging)
@@ -423,6 +423,7 @@ namespace UnityEngine.EventSystems
                 pointerEvent.eligibleForClick = false;
                 pointerEvent.pointerPress = null;
                 pointerEvent.rawPointerPress = null;
+                pointerEvent.pointerClick = null;
 
                 if (pointerEvent.pointerDrag != null && pointerEvent.dragging)
                     ExecuteEvents.Execute(pointerEvent.pointerDrag, pointerEvent, ExecuteEvents.endDragHandler);
@@ -433,9 +434,9 @@ namespace UnityEngine.EventSystems
                 // send exit events as we need to simulate this on touch up on touch device
                 ExecuteEvents.ExecuteHierarchy(pointerEvent.pointerEnter, pointerEvent, ExecuteEvents.pointerExitHandler);
                 pointerEvent.pointerEnter = null;
-
-                m_InputPointerEvent = pointerEvent;
             }
+
+            m_InputPointerEvent = pointerEvent;
         }
 
         /// <summary>
@@ -597,14 +598,21 @@ namespace UnityEngine.EventSystems
 
                 DeselectIfSelectionChanged(currentOverGo, pointerEvent);
 
+                var resetDiffTime = Time.unscaledTime - pointerEvent.clickTime;
+                if (resetDiffTime >= doubleClickTime)
+                {
+                    pointerEvent.clickCount = 0;
+                }
+
                 // search for the control that will receive the press
                 // if we can't find a press handler set the press
                 // handler to be what would receive a click.
                 var newPressed = ExecuteEvents.ExecuteHierarchy(currentOverGo, pointerEvent, ExecuteEvents.pointerDownHandler);
+                var newClick = ExecuteEvents.GetEventHandler<IPointerClickHandler>(currentOverGo);
 
                 // didnt find a press handler... search for a click handler
                 if (newPressed == null)
-                    newPressed = ExecuteEvents.GetEventHandler<IPointerClickHandler>(currentOverGo);
+                    newPressed = newClick;
 
                 // Debug.Log("Pressed: " + newPressed);
 
@@ -613,7 +621,7 @@ namespace UnityEngine.EventSystems
                 if (newPressed == pointerEvent.lastPress)
                 {
                     var diffTime = time - pointerEvent.clickTime;
-                    if (diffTime < 0.3f)
+                    if (diffTime < doubleClickTime)
                         ++pointerEvent.clickCount;
                     else
                         pointerEvent.clickCount = 1;
@@ -627,6 +635,7 @@ namespace UnityEngine.EventSystems
 
                 pointerEvent.pointerPress = newPressed;
                 pointerEvent.rawPointerPress = currentOverGo;
+                pointerEvent.pointerClick = newClick;
 
                 pointerEvent.clickTime = time;
 

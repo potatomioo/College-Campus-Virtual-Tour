@@ -94,6 +94,11 @@ namespace UnityEngine.UI
         [SerializeField]
         protected LayerMask m_BlockingMask = kNoEventMaskSet;
 
+        /// <summary>
+        /// The type of objects specified through LayerMask that are checked to determine if they block graphic raycasts.
+        /// </summary>
+        public LayerMask blockingMask { get { return m_BlockingMask; } set { m_BlockingMask = value; } }
+
         private Canvas m_Canvas;
 
         protected GraphicRaycaster()
@@ -123,7 +128,7 @@ namespace UnityEngine.UI
             if (canvas == null)
                 return;
 
-            var canvasGraphics = GraphicRegistry.GetGraphicsForCanvas(canvas);
+            var canvasGraphics = GraphicRegistry.GetRaycastableGraphicsForCanvas(canvas);
             if (canvasGraphics == null || canvasGraphics.Count == 0)
                 return;
 
@@ -135,25 +140,11 @@ namespace UnityEngine.UI
             else
                 displayIndex = currentEventCamera.targetDisplay;
 
-            var eventPosition = Display.RelativeMouseAt(eventData.position);
-            if (eventPosition != Vector3.zero)
-            {
-                // We support multiple display and display identification based on event position.
+            Vector3 eventPosition = MultipleDisplayUtilities.GetRelativeMousePositionForRaycast(eventData);
 
-                int eventDisplayIndex = (int)eventPosition.z;
-
-                // Discard events that are not part of this display so the user does not interact with multiple displays at once.
-                if (eventDisplayIndex != displayIndex)
-                    return;
-            }
-            else
-            {
-                // The multiple display system is not supported on all platforms, when it is not supported the returned position
-                // will be all zeros so when the returned index is 0 we will default to the event data to be safe.
-                eventPosition = eventData.position;
-
-                // We dont really know in which display the event occured. We will process the event assuming it occured in our display.
-            }
+            // Discard events that are not part of this display so the user does not interact with multiple displays at once.
+            if ((int) eventPosition.z != displayIndex)
+                return;
 
             // Convert to view space
             Vector2 pos;
@@ -201,9 +192,11 @@ namespace UnityEngine.UI
                 {
                     if (ReflectionMethodsCache.Singleton.raycast3D != null)
                     {
-                        var hits = ReflectionMethodsCache.Singleton.raycast3DAll(ray, distanceToClipPlane, (int)m_BlockingMask);
-                        if (hits.Length > 0)
-                            hitDistance = hits[0].distance;
+                        RaycastHit hit;
+                        if (ReflectionMethodsCache.Singleton.raycast3D(ray, out hit, distanceToClipPlane, (int)m_BlockingMask))
+                        {
+                            hitDistance = hit.distance;
+                        }
                     }
                 }
 #endif
@@ -298,10 +291,13 @@ namespace UnityEngine.UI
         {
             get
             {
-                if (canvas.renderMode == RenderMode.ScreenSpaceOverlay || (canvas.renderMode == RenderMode.ScreenSpaceCamera && canvas.worldCamera == null))
+                var canvas = this.canvas;
+                var renderMode = canvas.renderMode;
+                if (renderMode == RenderMode.ScreenSpaceOverlay
+                    || (renderMode == RenderMode.ScreenSpaceCamera && canvas.worldCamera == null))
                     return null;
 
-                return canvas.worldCamera != null ? canvas.worldCamera : Camera.main;
+                return canvas.worldCamera ?? Camera.main;
             }
         }
 
@@ -321,7 +317,7 @@ namespace UnityEngine.UI
                 if (!graphic.raycastTarget || graphic.canvasRenderer.cull || graphic.depth == -1)
                     continue;
 
-                if (!RectTransformUtility.RectangleContainsScreenPoint(graphic.rectTransform, pointerPosition, eventCamera))
+                if (!RectTransformUtility.RectangleContainsScreenPoint(graphic.rectTransform, pointerPosition, eventCamera, graphic.raycastPadding))
                     continue;
 
                 if (eventCamera != null && eventCamera.WorldToScreenPoint(graphic.rectTransform.position).z > eventCamera.farClipPlane)

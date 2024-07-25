@@ -17,12 +17,17 @@ namespace UnityEngine.UI.Tests
         bool m_dirtyLayout;
         bool m_dirtyMaterial;
 
+        Camera m_camera;
+        GameObject m_CanvasRoot;
+
         [SetUp]
         public void TestSetup()
         {
-            var canvasRoot = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas));
+            m_CanvasRoot = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas));
             GameObject gameObject = new GameObject("Image", typeof(RectTransform), typeof(Image));
-            gameObject.transform.SetParent(canvasRoot.transform);
+            gameObject.transform.SetParent(m_CanvasRoot.transform);
+
+            m_camera = new GameObject("Camera", typeof(Camera)).GetComponent<Camera>();
 
             m_Image = gameObject.GetComponent<Image>();
 
@@ -57,6 +62,10 @@ namespace UnityEngine.UI.Tests
         {
             m_Image = null;
             m_Sprite = null;
+
+            GameObject.DestroyImmediate(m_CanvasRoot);
+            GameObject.DestroyImmediate(m_camera.gameObject);
+            m_camera = null;
         }
 
         private void ResetDirtyFlags()
@@ -91,7 +100,7 @@ namespace UnityEngine.UI.Tests
         public void RaycastOverImageWithoutASpriteReturnTrue()
         {
             m_Image.sprite = null;
-            bool raycast = m_Image.Raycast(new Vector2(10, 10), new Camera());
+            bool raycast = m_Image.Raycast(new Vector2(10, 10), m_camera);
             Assert.AreEqual(true, raycast);
         }
 
@@ -107,7 +116,47 @@ namespace UnityEngine.UI.Tests
         public void RaycastOverImageWithoutASpriteReturnsTrueWithCoordinatesOutsideTheBoundaries(float alphaThreshold, float x, float y)
         {
             m_Image.alphaHitTestMinimumThreshold = 1.0f - alphaThreshold;
-            bool raycast = m_Image.Raycast(new Vector2(x, y), new Camera());
+            bool raycast = m_Image.Raycast(new Vector2(x, y), m_camera);
+            Assert.IsTrue(raycast);
+        }
+
+        [Test]
+        public void RaycastOverImageWithNonZeroSpritePosition_AlphaHitTestMinimumThreshold()
+        {
+            var canvas = m_CanvasRoot.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            canvas.worldCamera = m_camera;
+
+            // Create a square sprite (64x64) in the middle of a transparent area (128x128).
+            Color[] colors = new Color[128 * 128];
+            for (int y = 32; y < 96; y++)
+                for (int x = 32; x < 96; x++)
+                    colors[x + 128 * y] = Color.red;
+            texture.SetPixels(colors);
+            texture.Apply();
+
+            // Set it so that the red square fills the entire screen. Clicking anywehere inside the canvas should hit the image and pass.
+            m_Sprite = Sprite.Create(texture, new Rect(32, 32, 64, 64), new Vector2(0.5f, 0.5f), 100);
+            m_Image.sprite = m_Sprite;
+            m_Image.alphaHitTestMinimumThreshold = 0.5f;
+            m_Image.rectTransform.anchorMin = Vector2.zero;
+            m_Image.rectTransform.anchorMax = Vector2.one;
+
+            Assert.True(m_Image.Raycast(new Vector2(0, 0), m_camera), "Expected raycast to hit when clicking bottom left corner of screen.");
+            Assert.True(m_Image.Raycast(new Vector2(0, Screen.height), m_camera), "Expected raycast to hit when clicking top left corner of screen.");
+            Assert.True(m_Image.Raycast(new Vector2(Screen.width, 0), m_camera), "Expected raycast to hit when clicking bottom right corner of screen.");
+            Assert.True(m_Image.Raycast(new Vector2(Screen.width, Screen.height), m_camera), "Expected raycast to hit when clicking top right corner of screen.");
+            Assert.True(m_Image.Raycast(new Vector2(Screen.width / 2.0f, Screen.height / 2.0f), m_camera), "Expected raycast to hit when clicking center of screen.");
+        }
+
+        [Test]
+        public void RaycastOverImage_IgnoresDisabledCanvasGroup()
+        {
+            var canvasGroup = m_CanvasRoot.AddComponent<CanvasGroup>();
+            canvasGroup.blocksRaycasts = false;
+            canvasGroup.enabled = false;
+
+            bool raycast = m_Image.Raycast(new Vector2(1000, 1000), m_camera);
             Assert.IsTrue(raycast);
         }
 
